@@ -7,6 +7,7 @@ class Config:
     dataset_name: str = "flickr30k"
     dataset_root: str = "/mnt/media/eleonora/flickr30k"
 
+    run_type: str = "train"  # "train" / "test" 
     embedding_dim: int = 128
     output_dim: int = 128
     reproject_with_shared_head: bool = False
@@ -28,6 +29,7 @@ class Config:
     plot_path: str = "./plot"
     wandb: bool = True
     run: str = ""  # filled after overrides
+    wandb_artifact_name: str = ""  # e.g. "rucci-emanuele-personal/flickr30k_ContrastiveLearning/best-model:v160"
 
     def finalize(self):
         if not self.run:

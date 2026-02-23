@@ -1,0 +1,10 @@
+run_type: "test"
+run: "SharedHead_tau_0.4_learnable(False)_embdim512"
+embedding_dim: 512
+output_dim: 512
+contra_temp_init : 0.4
+contra_temp_learnable : False
+reproject_with_shared_head: True
+wandb_artifact_name: "rucci-emanuele-personal/flickr30k_ContrastiveLearning/best-model:v160"
+batch_size: 256
+wandb: False

@@ -8,3 +8,5 @@ __pycache__
 *.pyc
 *.kv
 *.npy
+dataset/precomputed_embeddings
+artifacts

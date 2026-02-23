@@ -14,7 +14,7 @@ from models.text_encoder import TextEncoder
 from models.img_encoder import VisionEncoder
 from models.shared_head import SharedHead
 from dataloader import get_dataloaders
-from pipelines import train_model_with_visualization
+from pipelines import train_model_with_visualization, test_model_against_tasks
 
 from config_loader import load_configs_from_dir
 matplotlib.use("Agg")
@@ -37,7 +37,7 @@ def run_experiment(cf):
     seed_everything(cf.seed)
 
     run_wandb = None
-    if cf.wandb:
+    if cf.wandb and cf.run_type == "train":
         run_wandb = wandb.init(
             settings=wandb.Settings(init_timeout=120),
             project=f"{cf.dataset_name}_ContrastiveLearning",
@@ -65,28 +65,40 @@ def run_experiment(cf):
     optimizer = torch.optim.Adam(params, lr=cf.lr)
 
     train_loader, val_loader, test_loader = get_dataloaders(cf)
-
-    train_model_with_visualization(
-        cf,
-        text_encoder,
-        vision_encoder,
-        shared_head if cf.reproject_with_shared_head else None,
-        train_loader,
-        val_loader,
-        optimizer,
-        device=device,
-        num_iterations=cf.num_iterations,
-        contra_temp=contra_temp
-    )
+    
+    if cf.run_type == "test":
+        print("Running in TEST mode: skipping training and evaluating the best checkpoint on test set.")
+        # --- load best checkpoint from W&B ---
+        test_model_against_tasks(
+            cf,
+            text_encoder,
+            vision_encoder,
+            shared_head if cf.reproject_with_shared_head else None,
+            test_loader,
+            device=device
+        )
+    else:
+        train_model_with_visualization(
+            cf,
+            text_encoder,
+            vision_encoder,
+            shared_head if cf.reproject_with_shared_head else None,
+            train_loader,
+            val_loader,
+            optimizer,
+            device=device,
+            num_iterations=cf.num_iterations,
+            contra_temp=contra_temp
+        )
 
     if run_wandb is not None:
         run_wandb.finish()
 
 
 def main():
-    configs = load_configs_from_dir("./config_dir/shared_head")
+    configs = load_configs_from_dir("./config_dir/v1_1")
 
-    print(f"Found {len(configs)} configs in {'./config_dir/shared_head'}:")
+    print(f"Found {len(configs)} configs in {'./config_dir/v1_1'}:")
     for i, (path, cf) in enumerate(configs, 1):
         print(f"\n=== Running experiment {i}/{len(configs)} ===")
         print(f"Config: {path}")

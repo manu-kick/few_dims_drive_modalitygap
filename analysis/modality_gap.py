@@ -53,7 +53,6 @@ def rmg_denominator(mod1, mod2 , numerator):
 
     return (factor_multiplier * (intra_mod1 + intra_mod2))+ numerator
 
-
 def RMG(cf,metric,text_embeddings,vision_embeddings,iterations):
     couple_modalities = [('text','vision')]
 
@@ -83,7 +82,6 @@ def RMG(cf,metric,text_embeddings,vision_embeddings,iterations):
     #     wandb.log({f'{metric}_gap': {
     #         'mean': overall_rmg
     #     }})
-
 
 # L2 Instance gap
 def L2I(cf,metric,text_embeddings,vision_embeddings,iterations):

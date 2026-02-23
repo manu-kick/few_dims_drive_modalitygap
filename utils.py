@@ -84,3 +84,19 @@ def log_model_to_wandb(
         artifact.add_file(path, name="model.pt")
 
         wandb.log_artifact(artifact, aliases=[artifact_alias])
+        
+        
+def get_run_id_from_name(entity: str, project: str, run_name: str, timeout: int = 120) -> str:
+    api = wandb.Api(timeout=timeout)
+
+    # "name" in wandb UI corrisponde a display_name
+    runs = api.runs(f"{entity}/{project}", filters={"display_name": run_name})
+
+    if len(runs) == 0:
+        raise ValueError(f"Nessuna run trovata con display_name='{run_name}' in {entity}/{project}")
+
+    if len(runs) > 1:
+        # se hai collisioni di nome, scegli l'ultima aggiornata
+        runs = sorted(runs, key=lambda r: r.updated_at, reverse=True)
+
+    return runs[0].id

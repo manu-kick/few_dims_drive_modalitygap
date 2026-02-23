@@ -2,8 +2,6 @@
 import torch 
 import wandb
 
-import torch
-
 ## varianza nella coppia i,i per le 2 modalità (la coppia i i è una classe)
 
 

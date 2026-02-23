@@ -160,6 +160,65 @@ class Flickr30kNoRepeatCaptionDataset(Dataset):
         return image, caption, fn, cap_idx  # fn/cap_idx are handy for debugging
 
 
+class Flickr30k_TestDataset(Dataset):
+    """
+    One item = one image + ONE random caption (deterministic).
+    """
+
+    def __init__(
+        self,
+        images_dir: str,
+        captions_by_file: Dict[str, List[str]],
+        filenames: List[str],
+        seed: int = 42,
+        transform=None,
+        require_n_captions: int = 5,
+    ):
+        self.images_dir = images_dir
+        self.captions_by_file = captions_by_file
+        self.transform = transform
+
+        rng = random.Random(seed)
+
+        kept = []
+        chosen_caption_idx = {}
+
+        for fn in filenames:
+            if fn not in captions_by_file:
+                continue
+            if require_n_captions is not None and len(captions_by_file[fn]) < require_n_captions:
+                continue
+
+            img_path = os.path.join(images_dir, fn)
+            if not os.path.isfile(img_path):
+                continue
+
+            kept.append(fn)
+
+            # scegli UNA caption random per immagine
+            cap_idx = rng.randint(0, len(captions_by_file[fn]) - 1)
+            chosen_caption_idx[fn] = cap_idx
+
+        self.filenames = kept
+        self.chosen_caption_idx = chosen_caption_idx
+
+    def __len__(self):
+        return len(self.filenames)
+
+    def __getitem__(self, idx: int):
+        fn = self.filenames[idx]
+        img_path = os.path.join(self.images_dir, fn)
+
+        image = Image.open(img_path).convert("RGB")
+        if self.transform is not None:
+            image = self.transform(image)
+
+        cap_idx = self.chosen_caption_idx[fn]
+        caption = self.captions_by_file[fn][cap_idx]
+
+        return image, caption, fn, cap_idx
+
+
 def get_dataloaders(cf):
     captions_txt = os.path.join(cf.dataset_root, "captions.txt")
     images_dir = os.path.join(cf.dataset_root, "Images")
@@ -194,7 +253,7 @@ def get_dataloaders(cf):
         transform=transform,
         require_n_captions=5,
     )
-    test_ds = Flickr30kNoRepeatCaptionDataset(
+    test_ds = Flickr30k_TestDataset(
         images_dir=images_dir,
         captions_by_file=captions_by_file,
         filenames=test_files,
@@ -205,10 +264,11 @@ def get_dataloaders(cf):
 
     # DataLoaders
     g = torch.Generator()
+    print("batch size:", cf.batch_size)
     g.manual_seed(cf.seed)
     train_loader = DataLoader(
         train_ds,
-        batch_size=32,
+        batch_size=cf.batch_size,
         shuffle=True,              # shuffle pairs => "caption scelta a caso"
         num_workers=4,
         pin_memory=True,
@@ -217,7 +277,7 @@ def get_dataloaders(cf):
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=32,
+        batch_size=cf.batch_size,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
@@ -225,7 +285,7 @@ def get_dataloaders(cf):
     )
     test_loader = DataLoader(
         test_ds,
-        batch_size=32,
+        batch_size=cf.batch_size,
         shuffle=False,
         num_workers=4,
         pin_memory=True,
