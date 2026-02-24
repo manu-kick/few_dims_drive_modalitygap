@@ -6,9 +6,11 @@ import wandb
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
+from sklearn.manifold import TSNE
 
 
-def visualize_3d(cf, text_embeddings, vision_embeddings, iterations):
+
+def visualize_3d(cf, text_embeddings, vision_embeddings, iterations, save=True):
     """
     Fit ONE PCA (3 components) on the concatenation of text+vision embeddings,
     then project both modalities into the SAME PCA space and plot together.
@@ -73,20 +75,50 @@ def visualize_3d(cf, text_embeddings, vision_embeddings, iterations):
     ax.set_zlim(all_min[2] - pad[2], all_max[2] + pad[2])
 
     # --- save ---
-    path = os.path.join(cf.plot_path, "latent_space_visualizations")
-    os.makedirs(path, exist_ok=True)
-    save_path = os.path.join(path, f"PCA_space_at_{iterations}.png")
-    plt.savefig(save_path, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+    if save:
+        path = os.path.join(cf.plot_path, "latent_space_visualizations")
+        os.makedirs(path, exist_ok=True)
+        save_path = os.path.join(path, f"PCA_space_at_{iterations}.png")
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
 
-    # --- wandb ---
-    if (iterations % cf.eval_every == 0) and getattr(cf, "wandb", False):
-        wandb.log({
-            "pca_3d": wandb.Image(save_path),
-            "pca_explained_variance": explained_variance_ratio
-        })
+        # --- wandb ---
+        if (iterations % cf.eval_every == 0) and getattr(cf, "wandb", False):
+            wandb.log({
+                "pca_3d": wandb.Image(save_path),
+                "pca_explained_variance": explained_variance_ratio
+            })
 
     return text_pca, vision_pca, explained_variance_ratio 
 
 def visualize_3d_interatively():
     pass
+
+
+def tsne_3d(text_embeddings, vision_embeddings, iterations=None, perplexity=30, seed=0):
+    """
+    text_embeddings: (N, D) numpy
+    vision_embeddings: (N, D) numpy
+    """
+    X = np.vstack([text_embeddings, vision_embeddings])
+    labels = np.array([0]*len(text_embeddings) + [1]*len(vision_embeddings))  # 0=text, 1=vision
+
+    tsne = TSNE(
+        n_components=3,
+        perplexity=perplexity,
+        init="pca",
+        learning_rate="auto",
+        random_state=seed
+    )
+    Z = tsne.fit_transform(X)  # (2N, 3)
+
+    fig = plt.figure(figsize=(8, 7))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(Z[labels==0,0], Z[labels==0,1], Z[labels==0,2], s=8, alpha=0.6, label="text")
+    ax.scatter(Z[labels==1,0], Z[labels==1,1], Z[labels==1,2], s=8, alpha=0.6, label="vision")
+    ax.set_title(f"t-SNE 3D (iter={iterations})")
+    ax.legend()
+    plt.show()
+
+    return Z, labels
+    
