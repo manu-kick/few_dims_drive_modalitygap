@@ -13,3 +13,5 @@ dataset/flickr30k/precomputed_embeddings_with_labels
 scenario_1
 scenario_2
 dataset/cifar10/data/
+dataset/cifar10/precomputed_cifar10_text_vision_labels/
+dataset/mscoco/data

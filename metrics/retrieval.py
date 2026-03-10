@@ -63,7 +63,17 @@ def retrieval_cifar10(X, Y, labels, top_k=1, labels_to_emb=None):
     
     
     
-    
+def compute_paired_retrieval_mscoco(inputs, top_k=1):
+    """
+    inputs = (queries, targets)
+    Positive pair is the diagonal match inside the batch.
+    """
+    Q, T = inputs
+    sims = Q @ T.T
+    ranks = torch.argsort(sims, dim=1, descending=True)
+    gt = torch.arange(Q.shape[0], device=Q.device).unsqueeze(1)
+    hits = (ranks[:, :top_k] == gt).any(dim=1).float()
+    return hits.mean().item()
 
   
     
@@ -73,6 +83,6 @@ def compute_retrieval(dataset_name, inputs, top_k=1, labels_to_emb=None):
     y = inputs[1]
     labels = inputs[2]
     return retrieval_cifar10(x, y, labels, top_k=top_k, labels_to_emb=labels_to_emb)
-  
-  raise Exception("Ensure correct format of inputs for retrival for other datasets different from cifar10.")
+  if dataset_name == 'mscoco':
+    return compute_paired_retrieval_mscoco(inputs, top_k=top_k)
   

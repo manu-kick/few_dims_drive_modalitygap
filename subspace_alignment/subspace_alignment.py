@@ -14,7 +14,12 @@ import matplotlib.pyplot as plt
 
 sys.path.append(os.path.abspath(".."))
 from metrics.retrieval import compute_retrieval
+from metrics.clustering import (
+    clustering_metrics_from_two_modalities,
+    clustering_metrics_two_modalities_multilabel_mscoco,
+)
 from analysis.modality_gap import compute_gap
+from analysis.viz import plot_pca_2d_mscoco_multilabel_blend, plot_pca_2d_mscoco
 
 
 def _clustering_metrics_two_modalities(X, Y, labels, n_clusters=10, random_state=0):
@@ -86,27 +91,30 @@ def _plot_pca_2d(emb_2N, labels_2N, title, max_points=6000):
     plt.tight_layout()
     plt.show()
 
-def collect_embeddings(loader, device):
+def collect_embeddings(loader, max_samples=10_000, device="cuda"):
     """
     Collects (text, vision) pairs from loader into torch tensors.
     Each batch is (text_emb, vision_emb).
     """
     Xs, Ys = [], []
-    # if max_sample is none, we take all the available samples
+    n_samples = 0
     
     with torch.no_grad():
         for text_b, vis_b, _ in tqdm(loader, desc=f"Collecting samples"):
             text_b = F.normalize(text_b.to(device), dim=-1)
             vis_b  = F.normalize(vis_b.to(device), dim=-1)
             Xs.append(text_b); Ys.append(vis_b)
-    X = torch.cat(Xs, dim=0)
-    Y = torch.cat(Ys, dim=0)
+            n_samples += text_b.shape[0]
+            if n_samples >= max_samples:
+                break
+    X = torch.cat(Xs, dim=0)[:max_samples]
+    Y = torch.cat(Ys, dim=0)[:max_samples]
     return X, Y
 
-def fit_subspace_alignment(loader, d_sub = 256, device="cuda"):
+def fit_subspace_alignment(loader, n_fit=10_000, d_sub = 256, device="cuda"):
     # 1. Collect embeddings
-    X, Y = collect_embeddings(loader, device)
-    print(f"Collected {X.shape[0]} samples of dimension {X.shape[1]}")
+    X, Y = collect_embeddings(loader, max_samples=n_fit, device=device)
+    print(f"Collected {X.shape[0]} samples of dimension {X.shape[1]}, these will be used to fit the subspace alignment model with d_sub={d_sub}.")
 
     # center (PCA-style)
     muX = X.mean(axis=0, keepdims=True)
@@ -179,6 +187,209 @@ def analyze_subspace_dimensions(model, device):
     
     return top_impX, top_impY, top_imp_joint
 
+def eval_subspace_alignment_mscoco(
+    test_loader,
+    alignment_model,
+    device="cuda",
+    gaps=("RMG", "L2M", "L2I", "cosineTP"),
+    do_clustering=True,
+    n_clusters=None,
+    max_cluster_samples=5000,
+    plot_pca=True,
+    max_pca_points=6000,
+    max_classes_to_color=20,
+    label_mode="primary",
+):
+    r_orig = {1: [], 5: [], 10: []}
+    r_al   = {1: [], 5: [], 10: []}
+    gaps_orig_batches = {g: [] for g in gaps}
+    gaps_al_batches = {g: [] for g in gaps}
+
+    X_all, Y_all, Yal_all = [], [], []
+    y_all = []
+    Xt_buf, Xv_buf, Xv_al_buf, y_buf = [], [], [], []
+    seen = 0
+    def _to_scalar(v):
+        if isinstance(v, dict):
+            v = v.get("text_vision", next(iter(v.values())))
+        if torch.is_tensor(v):
+            v = v.item()
+        return float(v)
+
+    def _labels_batch_to_list(labels_batch):
+        if torch.is_tensor(labels_batch):
+            return [labels_batch[i] for i in range(labels_batch.shape[0])]
+        if isinstance(labels_batch, np.ndarray):
+            return [labels_batch[i] for i in range(labels_batch.shape[0])]
+        if isinstance(labels_batch, (list, tuple)):
+            return list(labels_batch)
+        return [labels_batch]
+
+    def _to_label_list(lbl):
+        if lbl is None:
+            return []
+        if hasattr(lbl, "detach") and hasattr(lbl, "cpu"):
+            lbl = lbl.detach().cpu().numpy()
+        if isinstance(lbl, np.ndarray):
+            if lbl.ndim == 0:
+                return [int(lbl.item())]
+            return [int(v) for v in lbl.reshape(-1).tolist()]
+        if isinstance(lbl, (list, tuple)):
+            return [int(v) for v in lbl]
+        return [int(lbl)]
+
+    def _primary_label(lbl):
+        lbl_list = _to_label_list(lbl)
+        return int(lbl_list[0]) if len(lbl_list) > 0 else -1
+
+    with torch.no_grad():
+        for text_b, vis_b, labels in tqdm(test_loader, desc="Eval subspace alignment"):
+            X = F.normalize(text_b.to(device), dim=-1)
+            Y = F.normalize(vis_b.to(device),  dim=-1)
+            
+            # original retrieval
+            r_orig[1].append(compute_retrieval("mscoco", (X, Y), top_k=1))
+            r_orig[5].append(compute_retrieval("mscoco", (X, Y), top_k=5))
+            r_orig[10].append(compute_retrieval("mscoco", (X, Y), top_k=10))
+
+            # aligned vision -> text-space
+            _, _, Yaln = apply_subspace_alignment(X, Y, alignment_model, renorm=True)
+
+            r_al[1].append(compute_retrieval("mscoco", (X, Yaln), top_k=1))
+            r_al[5].append(compute_retrieval("mscoco", (X, Yaln), top_k=5))
+            r_al[10].append(compute_retrieval("mscoco", (X, Yaln), top_k=10))
+
+            for g in gaps:
+                go = compute_gap(g, X, Y, iterations=None)
+                ga = compute_gap(g, X, Yaln, iterations=None)
+                gaps_orig_batches[g].append(_to_scalar(go))
+                gaps_al_batches[g].append(_to_scalar(ga))
+
+            X_all.append(X)
+            Y_all.append(Y)
+            Yal_all.append(Yaln)
+            y_all.extend(_labels_batch_to_list(labels))
+
+            if do_clustering and seen < max_cluster_samples:
+                b = min(X.shape[0], max_cluster_samples - seen)
+                Xt_buf.append(X[:b].detach().cpu())
+                Xv_buf.append(Y[:b].detach().cpu())
+                Xv_al_buf.append(Yaln[:b].detach().cpu())
+                y_buf.extend(_labels_batch_to_list(labels)[:b])
+                seen += b
+
+    X_all = torch.cat(X_all, dim=0)
+    Y_all = torch.cat(Y_all, dim=0)
+    Yal_all = torch.cat(Yal_all, dim=0)
+    gaps_orig, gaps_al = {}, {}
+
+    for g in gaps:
+        gaps_orig[g] = float(np.mean(gaps_orig_batches[g]))
+        gaps_al[g] = float(np.mean(gaps_al_batches[g]))
+
+    print("\n=== SUBSPACE ALIGNMENT TEST RESULTS ===")
+    print(f"d_sub = {alignment_model['d_sub']}")
+    print(f"Retrieval@1  orig: {np.mean(r_orig[1]):.4f} | aligned: {np.mean(r_al[1]):.4f}")
+    print(f"Retrieval@5  orig: {np.mean(r_orig[5]):.4f} | aligned: {np.mean(r_al[5]):.4f}")
+    print(f"Retrieval@10 orig: {np.mean(r_orig[10]):.4f} | aligned: {np.mean(r_al[10]):.4f}")
+    print("Gaps original:", gaps_orig)
+    print("Gaps aligned :", gaps_al)
+
+    clustering_out = {}
+    if do_clustering and len(Xt_buf) > 0:
+        Xt_all = torch.cat(Xt_buf, dim=0)
+        Xv_all = torch.cat(Xv_buf, dim=0)
+        Xv_al_all = torch.cat(Xv_al_buf, dim=0)
+
+        cluster_orig = clustering_metrics_two_modalities_multilabel_mscoco(
+            Xt_all,
+            Xv_all,
+            y_buf,
+            n_clusters=n_clusters,
+            random_state=0,
+            label_mode=label_mode,
+        )
+        cluster_al = clustering_metrics_two_modalities_multilabel_mscoco(
+            Xt_all,
+            Xv_al_all,
+            y_buf,
+            n_clusters=n_clusters,
+            random_state=0,
+            label_mode=label_mode,
+        )
+
+        print(
+            f"[Clustering | mode={label_mode}] ORIG    "
+            f"ARI={cluster_orig['ARI']:.4f} | NMI={cluster_orig['NMI']:.4f} | "
+            f"Hom={cluster_orig['Homogeneity']:.4f} | V={cluster_orig['V-measure']:.4f} | "
+            f"k={cluster_orig['n_clusters']} | classes={cluster_orig['n_classes']}"
+        )
+        print(
+            f"[Clustering | mode={label_mode}] ALIGNED "
+            f"ARI={cluster_al['ARI']:.4f} | NMI={cluster_al['NMI']:.4f} | "
+            f"Hom={cluster_al['Homogeneity']:.4f} | V={cluster_al['V-measure']:.4f} | "
+            f"k={cluster_al['n_clusters']} | classes={cluster_al['n_classes']}"
+        )
+
+        clustering_out["clustering_orig"] = {
+            k: cluster_orig[k]
+            for k in ["ARI", "NMI", "Homogeneity", "V-measure", "n_clusters", "n_classes", "label_mode"]
+        }
+        clustering_out["clustering_aligned"] = {
+            k: cluster_al[k]
+            for k in ["ARI", "NMI", "Homogeneity", "V-measure", "n_clusters", "n_classes", "label_mode"]
+        }
+
+    if plot_pca:
+        n_samples = X_all.shape[0]
+        if len(y_all) != n_samples:
+            print(
+                "Warning: labels size does not match embeddings; skipping PCA plots. "
+                f"labels={len(y_all)} embeddings={n_samples}"
+            )
+        else:
+            labels_primary = np.array([_primary_label(lbl) for lbl in y_all], dtype=np.int64)
+            labels_2n = np.concatenate([labels_primary, labels_primary], axis=0)
+            emb_orig = torch.cat([X_all, Y_all], dim=0).detach().cpu().numpy()
+            emb_al = torch.cat([X_all, Yal_all], dim=0).detach().cpu().numpy()
+
+            plot_pca_2d_mscoco(
+                emb_2N=emb_orig,
+                labels_2N=labels_2n,
+                title=f"PCA 2D (orig, primary label) | subspace d={alignment_model['d_sub']}",
+                max_points=max_pca_points,
+                max_classes_to_color=max_classes_to_color,
+            )
+            plot_pca_2d_mscoco(
+                emb_2N=emb_al,
+                labels_2N=labels_2n,
+                title=f"PCA 2D (aligned, primary label) | subspace d={alignment_model['d_sub']}",
+                max_points=max_pca_points,
+                max_classes_to_color=max_classes_to_color,
+            )
+
+            plot_pca_2d_mscoco_multilabel_blend(
+                emb_2N=emb_orig,
+                labels_per_sample=y_all,
+                title=f"PCA 2D (orig, multi-label blend) | subspace d={alignment_model['d_sub']}",
+                max_points=max_pca_points,
+                max_classes_to_color=max_classes_to_color,
+            )
+            plot_pca_2d_mscoco_multilabel_blend(
+                emb_2N=emb_al,
+                labels_per_sample=y_all,
+                title=f"PCA 2D (aligned, multi-label blend) | subspace d={alignment_model['d_sub']}",
+                max_points=max_pca_points,
+                max_classes_to_color=max_classes_to_color,
+            )
+
+    return {
+        "retrieval_orig": {k: float(np.mean(v)) for k, v in r_orig.items()},
+        "retrieval_aligned": {k: float(np.mean(v)) for k, v in r_al.items()},
+        "gaps_orig": gaps_orig,
+        "gaps_aligned": gaps_al,
+        **clustering_out,
+    }
 
 def eval_subspace_alignment_cifar10(
     test_loader,

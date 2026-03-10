@@ -296,3 +296,297 @@ def umap_3d_v2(text_embeddings, vision_embeddings, iterations=None, n_neighbors=
     plt.show()
 
     return Z_text, Z_vision, labels
+
+
+
+
+
+
+
+
+
+
+
+
+###------------------ MSCOCO VIZ ----------------------
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from matplotlib.lines import Line2D
+
+
+
+def plot_pca_2d_mscoco_multilabel_blend(
+    emb_2N,
+    labels_per_sample,
+    title="PCA projection (multi-label color blending)",
+    max_points=6000,
+    max_classes_to_color=20,
+    seed=0,
+    cmap_name="tab20",
+    unknown_color=(0.7, 0.7, 0.7, 1.0),
+):
+    """
+    Joint PCA on [text; vision] with multi-label color blending.
+
+    Parameters
+    ----------
+    emb_2N : np.ndarray
+        Shape (2N, D), built as [text_embeddings; vision_embeddings]
+        or any equivalent ordering as long as it is first-half / second-half.
+    labels_per_sample : list
+        Length N.
+        Each element can be:
+          - np.ndarray of shape (L_i,)
+          - torch tensor of shape (L_i,)
+          - list[int]
+        representing all labels associated with that sample.
+    title : str
+        Plot title.
+    max_points : int
+        Max total number of plotted points over the 2N embeddings.
+    max_classes_to_color : int
+        Only the most frequent classes get their own base colors.
+        Labels outside this set are ignored in the blending. If a sample has
+        no kept labels, it gets unknown_color.
+    seed : int
+        Random seed for subsampling and PCA.
+    cmap_name : str
+        Matplotlib categorical colormap name.
+    unknown_color : tuple
+        RGBA color for samples with no valid/kept labels.
+    """
+    emb_2N = np.asarray(emb_2N)
+    n2 = emb_2N.shape[0]
+    n = n2 // 2
+
+    if n2 % 2 != 0:
+        raise ValueError(f"emb_2N must have even first dimension, got {n2}")
+
+    if len(labels_per_sample) != n:
+        raise ValueError(
+            f"labels_per_sample must have length N={n}, got {len(labels_per_sample)}"
+        )
+
+    modality = np.concatenate([
+        np.zeros(n, dtype=np.int32),   # text
+        np.ones(n, dtype=np.int32),    # vision
+    ])
+
+    def to_label_list(x):
+        if x is None:
+            return []
+        if hasattr(x, "detach") and hasattr(x, "cpu"):
+            x = x.detach().cpu().numpy()
+        if isinstance(x, np.ndarray):
+            if x.ndim == 0:
+                return [int(x.item())]
+            return [int(v) for v in x.tolist()]
+        if isinstance(x, (list, tuple)):
+            return [int(v) for v in x]
+        return [int(x)]
+
+    labels_per_sample = [to_label_list(x) for x in labels_per_sample]
+
+    # Count class frequency over samples
+    freq = {}
+    for lbls in labels_per_sample:
+        for lbl in set(lbls):
+            if lbl >= 0:
+                freq[lbl] = freq.get(lbl, 0) + 1
+
+    sorted_labels = sorted(freq.keys(), key=lambda k: -freq[k])
+    keep_labels = sorted_labels[:max_classes_to_color]
+
+    cmap = plt.get_cmap(cmap_name, max(max_classes_to_color, 1))
+    label_to_color = {
+        lbl: cmap(i % max_classes_to_color)
+        for i, lbl in enumerate(keep_labels)
+    }
+
+    def blended_color(lbls):
+        cols = [label_to_color[lbl] for lbl in lbls if lbl in label_to_color]
+        if len(cols) == 0:
+            return unknown_color
+        cols = np.array(cols, dtype=np.float64)
+        return tuple(cols.mean(axis=0))
+
+    sample_colors = np.array([blended_color(lbls) for lbls in labels_per_sample], dtype=float)
+    colors_2N = np.concatenate([sample_colors, sample_colors], axis=0)
+
+    # Optional subsampling at sample level, so text/vision pairs stay aligned
+    if n2 > max_points:
+        max_samples = max_points // 2
+        max_samples = max(1, max_samples)
+
+        rng = np.random.RandomState(seed)
+        keep_idx = rng.choice(n, size=min(n, max_samples), replace=False)
+
+        emb_2N = np.concatenate([emb_2N[:n][keep_idx], emb_2N[n:][keep_idx]], axis=0)
+        colors_2N = np.concatenate([sample_colors[keep_idx], sample_colors[keep_idx]], axis=0)
+        modality = np.concatenate([
+            np.zeros(len(keep_idx), dtype=np.int32),
+            np.ones(len(keep_idx), dtype=np.int32),
+        ])
+
+    z = PCA(n_components=2, random_state=seed).fit_transform(emb_2N)
+
+    txt_mask = (modality == 0)
+    vis_mask = (modality == 1)
+
+    plt.figure(figsize=(7, 6))
+
+    plt.scatter(
+        z[vis_mask, 0],
+        z[vis_mask, 1],
+        c=colors_2N[vis_mask],
+        s=20,
+        marker="o",
+        alpha=0.72,
+    )
+
+    plt.scatter(
+        z[txt_mask, 0],
+        z[txt_mask, 1],
+        c=colors_2N[txt_mask],
+        s=20,
+        marker="x",
+        alpha=0.72,
+    )
+
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', label='vision',
+               markerfacecolor='gray', markeredgecolor='gray', markersize=7),
+        Line2D([0], [0], marker='x', color='gray', label='text',
+               linestyle='None', markersize=7),
+    ]
+    plt.legend(handles=legend_elements, loc="best")
+
+    plt.title(title)
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+def plot_pca_2d_mscoco(
+    emb_2N,
+    labels_2N,
+    title="PCA projection",
+    max_points=6000,
+    max_classes_to_color=20,
+    seed=0,
+):
+    """
+    PCA joint on [text; vision].
+
+    Colors are assigned by class label (for MSCOCO, typically the FIRST label
+    chosen for each sample and replicated for both text and vision embeddings).
+    Markers distinguish modality:
+      - 'x' -> text
+      - 'o' -> vision
+
+    Parameters
+    ----------
+    emb_2N : np.ndarray
+        Shape (2N, D), concatenation of [text_embeddings; vision_embeddings]
+        or [vision_embeddings; text_embeddings], as long as labels_2N matches.
+    labels_2N : np.ndarray
+        Shape (2N,), class labels already expanded to both modalities.
+        Example:
+            labels_2N = np.concatenate([labels_primary, labels_primary], axis=0)
+    title : str
+        Plot title.
+    max_points : int
+        Maximum number of total points to display.
+    max_classes_to_color : int
+        Number of most frequent classes to color distinctly.
+        Remaining classes are grouped into -1 and shown as a gray cloud.
+    seed : int
+        Random seed for subsampling.
+    """
+    emb_2N = np.asarray(emb_2N)
+    labels_2N = np.asarray(labels_2N)
+
+    if emb_2N.shape[0] != labels_2N.shape[0]:
+        raise ValueError(
+            f"emb_2N and labels_2N must have same first dimension, got "
+            f"{emb_2N.shape[0]} and {labels_2N.shape[0]}"
+        )
+
+    n2 = emb_2N.shape[0]
+    n = n2 // 2
+
+    # assumes first half modality 0, second half modality 1
+    modality = np.concatenate([
+        np.zeros(n, dtype=np.int32),         # text
+        np.ones(n2 - n, dtype=np.int32),     # vision
+    ])
+
+    # optional subsampling
+    if n2 > max_points:
+        rng = np.random.RandomState(seed)
+        idx = rng.choice(n2, size=max_points, replace=False)
+        emb_2N = emb_2N[idx]
+        labels_2N = labels_2N[idx]
+        modality = modality[idx]
+
+    # keep only the most frequent classes with unique colors
+    uniq, counts = np.unique(labels_2N, return_counts=True)
+    order = uniq[np.argsort(-counts)]
+    keep = set(order[:max_classes_to_color].tolist())
+
+    labels_vis = np.array(
+        [lbl if lbl in keep else -1 for lbl in labels_2N],
+        dtype=np.int64
+    )
+
+    # PCA on all displayed points jointly
+    z = PCA(n_components=2, random_state=seed).fit_transform(emb_2N)
+
+    plt.figure(figsize=(7, 6))
+
+    # vision: circles
+    vis_mask = (modality == 1)
+    txt_mask = (modality == 0)
+
+    sc_vis = plt.scatter(
+        z[vis_mask, 0],
+        z[vis_mask, 1],
+        c=labels_vis[vis_mask],
+        s=18,
+        marker="o",
+        alpha=0.70,
+        cmap="tab20",
+    )
+
+    # text: crosses, same color mapping
+    plt.scatter(
+        z[txt_mask, 0],
+        z[txt_mask, 1],
+        c=labels_vis[txt_mask],
+        s=18,
+        marker="x",
+        alpha=0.70,
+        cmap="tab20",
+        vmin=sc_vis.get_clim()[0],
+        vmax=sc_vis.get_clim()[1],
+    )
+
+    # manual legend for modality only
+    
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', label='vision',
+               markerfacecolor='gray', markeredgecolor='gray', markersize=7),
+        Line2D([0], [0], marker='x', color='gray', label='text',
+               linestyle='None', markersize=7),
+    ]
+    plt.legend(handles=legend_elements, loc="best")
+
+    plt.title(title)
+    plt.xlabel("PC1")
+    plt.ylabel("PC2")
+    plt.tight_layout()
+    plt.show()
