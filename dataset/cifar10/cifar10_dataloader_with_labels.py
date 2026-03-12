@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 class EmbeddingsDatasetWithLabels(Dataset):
@@ -110,3 +110,15 @@ class EmbeddingsDatasetWithLabels(Dataset):
             return text_emb, vision_emb, label_id, label_name
         else:
             return text_emb, vision_emb, label_id
+        
+
+def make_loaders_cifar10(batch_size=256, precomputed_train_dir=None, precomputed_test_dir=None, seed=0, num_workers=0):
+    ds_train = EmbeddingsDatasetWithLabels(precomputed_train_dir, split_name="train_shard")
+    ds_test = EmbeddingsDatasetWithLabels(precomputed_test_dir, split_name="test_shard")
+    n = len(ds_train)
+    n_train = int(0.8 * n)
+    n_test = n - n_train
+
+    train_loader = DataLoader(ds_train, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    test_loader  = DataLoader(ds_test,  batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    return train_loader, test_loader

@@ -2,7 +2,7 @@
 import os
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 class MSCOCOEmbeddingsDatasetWithLabels(Dataset):
@@ -230,3 +230,52 @@ class MSCOCOEmbeddingsDatasetWithLabels(Dataset):
             )
 
         return text_emb, vision_emb, label_ids
+
+
+def mscoco_collate_fn(batch):
+    """
+    Keeps variable-length label tensors as a Python list.
+    This is necessary because COCO labels are multi-label.
+    """
+    if len(batch[0]) == 3:
+        texts, visions, label_ids = zip(*batch)
+        return torch.stack(texts, dim=0), torch.stack(visions, dim=0), list(label_ids)
+
+    texts, visions, label_ids, img_ids, caption_ids, label_names = zip(*batch)
+    return (
+        torch.stack(texts, dim=0),
+        torch.stack(visions, dim=0),
+        list(label_ids),
+        torch.tensor(img_ids, dtype=torch.long),
+        torch.tensor(caption_ids, dtype=torch.long),
+        list(label_names),
+    )
+
+
+def make_loaders_mscoco(precomputed_dir, precomputed_dir_test, batch_size=256, num_workers=0):
+    ds_train = MSCOCOEmbeddingsDatasetWithLabels(
+        precomputed_dir,
+        split_name="train_shard",
+        require_labels=True,
+    )
+    ds_test = MSCOCOEmbeddingsDatasetWithLabels(
+        precomputed_dir_test,
+        split_name="val_shard",
+        require_labels=True,
+    )
+
+    train_loader = DataLoader(
+        ds_train,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        collate_fn=mscoco_collate_fn,
+    )
+    test_loader = DataLoader(
+        ds_test,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        collate_fn=mscoco_collate_fn,
+    )
+    return train_loader, test_loader

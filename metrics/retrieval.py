@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 import wandb
 
+# retrieval flickr30k
 def retrieval(text_embeddings, vision_embeddings, top_k=1):
     """
     Compute retrieval metrics (e.g., Recall@K) between text and vision embeddings.
@@ -85,4 +86,6 @@ def compute_retrieval(dataset_name, inputs, top_k=1, labels_to_emb=None):
     return retrieval_cifar10(x, y, labels, top_k=top_k, labels_to_emb=labels_to_emb)
   if dataset_name == 'mscoco':
     return compute_paired_retrieval_mscoco(inputs, top_k=top_k)
+  if dataset_name == 'flickr30k':
+    return retrieval(inputs[0], inputs[1], top_k=top_k)
   
