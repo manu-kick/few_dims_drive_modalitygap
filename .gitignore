@@ -17,3 +17,5 @@ dataset/cifar10/precomputed_cifar10_text_vision_labels/
 dataset/mscoco/data
 dataset/msrvtt/MSRVTT
 dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k
+analysis_2/msrvtt_clasification_runs
+analysis_2/wandb
