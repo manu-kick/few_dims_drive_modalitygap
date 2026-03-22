@@ -89,14 +89,11 @@ class MSRVTTEmbeddingsDatasetV2(Dataset):
                 # ---- keep only the first occurrence of each video_id ----
                 if vid in seen_video_ids:
                     continue
-                seen_video_ids[vid] = True
 
-                # ---- category / label ----
+                # ---- category / label (skip if not in metadata) ----
                 if vid not in self.videoid_to_category:
-                    raise RuntimeError(
-                        f"video_id '{vid}' not found in metadata for split "
-                        f"'{split_name}' (file: {path})"
-                    )
+                    continue
+                seen_video_ids[vid] = True
                 label_list.append(self.videoid_to_category[vid])
 
                 # ---- vision (always a simple 1-D vector) ----

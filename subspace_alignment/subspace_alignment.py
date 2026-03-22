@@ -540,33 +540,22 @@ def eval_subspace_alignment_flickr30k(
     gaps=("RMG", "L2M", "L2I", "cosineTP"),
     do_clustering=True,
     n_clusters=None,
-    max_cluster_samples=5000,
+    max_cluster_samples=5000,  # kept for backward-compatible call sites; not used as cutoff
     plot_pca=True,
     direction="text_to_vision",
 ):
     """
-    Evaluate subspace alignment on Flickr30k.
+    Evaluate subspace alignment on Flickr30k on the entire test set.
 
-    Assumptions:
-      - test_loader yields (text_emb, vision_emb, labels)
-      - compute_retrieval("flickr30k", (A, B, labels), top_k=k) is the correct API
-      - _clustering_metrics_two_modalities_flickr30k(X, Y, labels, n_clusters, random_state)
-        is already available/imported
-      - apply_subspace_alignment(X, Y, alignment_model, renorm=True) aligns Y into X-space
+    Collects all batches before computing retrieval, gaps, and clustering,
+    so that all metrics reflect the full test distribution (no per-batch averaging).
+    max_cluster_samples is kept only for backward-compatible call sites.
     """
 
-    r_orig = {1: [], 5: [], 10: []}
-    r_al   = {1: [], 5: [], 10: []}
-    gaps_orig_batches = {g: [] for g in gaps}
-    gaps_al_batches   = {g: [] for g in gaps}
-
-    # full buffers for optional PCA
-    X_all, Y_all, Yal_all = [], [], []
-    y_all = []
-
-    # reduced buffers for clustering
-    Xt_buf, Xv_buf, Xv_al_buf, y_buf = [], [], [], []
-    seen = 0
+    # single set of full-test buffers
+    Xt_buf, Xv_buf = [], []      # original (direction-aware)
+    Xn_buf, Xv_al_buf = [], []   # aligned (from apply_subspace_alignment)
+    y_buf = []
 
     def _to_scalar(v):
         if isinstance(v, dict):
@@ -587,82 +576,65 @@ def eval_subspace_alignment_flickr30k(
             else:
                 raise ValueError(f"Unknown direction: {direction}")
 
-            # original retrieval
-            r_orig[1].append(_to_scalar(compute_retrieval("flickr30k", (X_in, Y_in, labels), top_k=1)))
-            r_orig[5].append(_to_scalar(compute_retrieval("flickr30k", (X_in, Y_in, labels), top_k=5)))
-            r_orig[10].append(_to_scalar(compute_retrieval("flickr30k", (X_in, Y_in, labels), top_k=10)))
-
-            # align Y_in into X_in-space
             Xn, _, Yaln = apply_subspace_alignment(X_in, Y_in, alignment_model, renorm=True)
 
-            # aligned retrieval
-            r_al[1].append(_to_scalar(compute_retrieval("flickr30k", (Xn, Yaln, labels), top_k=1)))
-            r_al[5].append(_to_scalar(compute_retrieval("flickr30k", (Xn, Yaln, labels), top_k=5)))
-            r_al[10].append(_to_scalar(compute_retrieval("flickr30k", (Xn, Yaln, labels), top_k=10)))
-
-            # gaps
-            for g in gaps:
-                go = compute_gap(g, X_in, Y_in, iterations=None)
-                ga = compute_gap(g, Xn, Yaln, iterations=None)
-                gaps_orig_batches[g].append(_to_scalar(go))
-                gaps_al_batches[g].append(_to_scalar(ga))
-
-            # buffers for PCA
-            X_all.append(X_in.detach().cpu())
-            Y_all.append(Y_in.detach().cpu())
-            Yal_all.append(Yaln.detach().cpu())
+            Xt_buf.append(X_in.detach().cpu())
+            Xv_buf.append(Y_in.detach().cpu())
+            Xn_buf.append(Xn.detach().cpu())
+            Xv_al_buf.append(Yaln.detach().cpu())
 
             if torch.is_tensor(labels):
-                y_all.append(labels.detach().cpu())
+                y_buf.append(labels.detach().cpu())
             else:
-                y_all.append(torch.as_tensor(labels))
+                y_buf.append(torch.as_tensor(labels))
 
-            # buffers for clustering
-            if do_clustering and seen < max_cluster_samples:
-                b = min(X_in.shape[0], max_cluster_samples - seen)
-                Xt_buf.append(X_in[:b].detach().cpu())
-                Xv_buf.append(Y_in[:b].detach().cpu())
-                Xv_al_buf.append(Yaln[:b].detach().cpu())
+    # concatenate full test set
+    Xt_all    = torch.cat(Xt_buf, dim=0)
+    Xv_all    = torch.cat(Xv_buf, dim=0)
+    Xn_all    = torch.cat(Xn_buf, dim=0)
+    Xv_al_all = torch.cat(Xv_al_buf, dim=0)
+    y_all     = torch.cat(y_buf, dim=0)
 
-                if torch.is_tensor(labels):
-                    y_buf.append(labels[:b].detach().cpu())
-                else:
-                    y_buf.append(torch.as_tensor(labels)[:b])
+    if n_clusters is None:
+        n_clusters = int(torch.unique(y_all).numel())
 
-                seen += b
+    # retrieval on full test set
+    retrieval_orig = {
+        1:  _to_scalar(compute_retrieval("flickr30k", (Xt_all, Xv_all, y_all), top_k=1)),
+        5:  _to_scalar(compute_retrieval("flickr30k", (Xt_all, Xv_all, y_all), top_k=5)),
+        10: _to_scalar(compute_retrieval("flickr30k", (Xt_all, Xv_all, y_all), top_k=10)),
+    }
+    retrieval_aligned = {
+        1:  _to_scalar(compute_retrieval("flickr30k", (Xn_all, Xv_al_all, y_all), top_k=1)),
+        5:  _to_scalar(compute_retrieval("flickr30k", (Xn_all, Xv_al_all, y_all), top_k=5)),
+        10: _to_scalar(compute_retrieval("flickr30k", (Xn_all, Xv_al_all, y_all), top_k=10)),
+    }
 
-    gaps_orig = {g: float(np.mean(v)) for g, v in gaps_orig_batches.items()}
-    gaps_al   = {g: float(np.mean(v)) for g, v in gaps_al_batches.items()}
+    # gaps on full test set
+    Xt_dev    = Xt_all.to(device)
+    Xv_dev    = Xv_all.to(device)
+    Xn_dev    = Xn_all.to(device)
+    Xv_al_dev = Xv_al_all.to(device)
+
+    gaps_orig = {g: _to_scalar(compute_gap(g, Xt_dev, Xv_dev, iterations=None)) for g in gaps}
+    gaps_al   = {g: _to_scalar(compute_gap(g, Xn_dev, Xv_al_dev, iterations=None)) for g in gaps}
 
     print(f"\n=== SUBSPACE ALIGNMENT TEST RESULTS (Flickr30k | {direction}) ===")
-    print(f"d_sub = {alignment_model['d_sub']}")
-    print(f"Retrieval@1  orig: {np.mean(r_orig[1]):.4f} | aligned: {np.mean(r_al[1]):.4f}")
-    print(f"Retrieval@5  orig: {np.mean(r_orig[5]):.4f} | aligned: {np.mean(r_al[5]):.4f}")
-    print(f"Retrieval@10 orig: {np.mean(r_orig[10]):.4f} | aligned: {np.mean(r_al[10]):.4f}")
+    print(f"d_sub = {alignment_model['d_sub']} | N = {Xt_all.shape[0]}")
+    print(f"Retrieval@1  orig: {retrieval_orig[1]:.4f} | aligned: {retrieval_aligned[1]:.4f}")
+    print(f"Retrieval@5  orig: {retrieval_orig[5]:.4f} | aligned: {retrieval_aligned[5]:.4f}")
+    print(f"Retrieval@10 orig: {retrieval_orig[10]:.4f} | aligned: {retrieval_aligned[10]:.4f}")
     print("Gaps original:", gaps_orig)
     print("Gaps aligned :", gaps_al)
 
     clustering_out = {}
 
-    if do_clustering and len(Xt_buf) > 0:
-        Xt_all   = torch.cat(Xt_buf, dim=0)
-        Xv_all   = torch.cat(Xv_buf, dim=0)
-        Xv_al_all = torch.cat(Xv_al_buf, dim=0)
-        y_clust  = torch.cat(y_buf, dim=0)
-
+    if do_clustering:
         cluster_orig = _clustering_metrics_two_modalities_flickr30k(
-            Xt_all,
-            Xv_all,
-            y_clust,
-            n_clusters=n_clusters,
-            random_state=0,
+            Xt_all, Xv_all, y_all, n_clusters=n_clusters, random_state=0,
         )
         cluster_al = _clustering_metrics_two_modalities_flickr30k(
-            Xt_all,
-            Xv_al_all,
-            y_clust,
-            n_clusters=n_clusters,
-            random_state=0,
+            Xt_all, Xv_al_all, y_all, n_clusters=n_clusters, random_state=0,
         )
 
         print(
@@ -687,15 +659,11 @@ def eval_subspace_alignment_flickr30k(
             if k in cluster_al
         }
 
-    if plot_pca and len(X_all) > 0:
-        X_all   = torch.cat(X_all, dim=0)
-        Y_all   = torch.cat(Y_all, dim=0)
-        Yal_all = torch.cat(Yal_all, dim=0)
-        y_all   = torch.cat(y_all, dim=0).cpu().numpy()
-
-        emb_orig = torch.cat([X_all, Y_all], dim=0).cpu().numpy()
-        emb_al   = torch.cat([X_all, Yal_all], dim=0).cpu().numpy()
-        labels_2n = np.concatenate([y_all, y_all], axis=0)
+    if plot_pca:
+        emb_orig  = torch.cat([Xt_all, Xv_all], dim=0).cpu().numpy()
+        emb_al    = torch.cat([Xt_all, Xv_al_all], dim=0).cpu().numpy()
+        y_np      = y_all.numpy()
+        labels_2n = np.concatenate([y_np, y_np], axis=0)
 
         _plot_pca_2d(
             emb_orig,
@@ -709,8 +677,8 @@ def eval_subspace_alignment_flickr30k(
         )
 
     return {
-        "retrieval_orig": {k: float(np.mean(v)) for k, v in r_orig.items()},
-        "retrieval_aligned": {k: float(np.mean(v)) for k, v in r_al.items()},
+        "retrieval_orig": retrieval_orig,
+        "retrieval_aligned": retrieval_aligned,
         "gaps_orig": gaps_orig,
         "gaps_aligned": gaps_al,
         **clustering_out,

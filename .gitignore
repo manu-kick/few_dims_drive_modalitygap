@@ -19,4 +19,5 @@ dataset/msrvtt/MSRVTT
 dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_multiple_videos
 dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_v2
 analysis_2/msrvtt_classification_runs
+analysis_2/msrvtt_v2_classification_runs
 analysis_2/wandb
