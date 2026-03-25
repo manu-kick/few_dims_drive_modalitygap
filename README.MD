@@ -6,6 +6,6 @@ Training from scratch these encoders to remove the modality gap is very expensin
 We want a method that we can apply to the pretrained encoder that allows us to get the same performace in retrieval while having a latent space more homogeneous and less fragmentedsuch that we can perform other tasks rather then the only retrieval.
 
 
-## Todo:
-- classification analysis for the dasets (cifar10, mscoco with imagenet labels, flicker30k with imagenet labels, msrvtt with its labels), 
-FiLMR layer in file analysis/filmr_scott.py
+TODO:
+- check that the cosine dissimilarity d in the RMG computation is actually scaled in 0,1 like the two effects one trigger
+- 
