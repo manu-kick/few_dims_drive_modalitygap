@@ -28,16 +28,20 @@ def rmg_denominator(mod1, mod2, numerator):
     mod2 = mod2.float() if not mod2.dtype == torch.float32 else mod2
     N = mod1.shape[0]
     factor_multiplier = 1 / ((2 * N) * (N - 1))
-    
 
-    sim_mod1 = torch.nn.functional.cosine_similarity(mod1.unsqueeze(1), mod1.unsqueeze(0), dim=-1)
-    sim_mod2 = torch.nn.functional.cosine_similarity(mod2.unsqueeze(1), mod2.unsqueeze(0), dim=-1)
+    # Compute pairwise cosine similarities via normalized Gram matrices.
+    # This avoids the previous N x N x D broadcasted tensor, which can
+    # explode GPU memory for large batches.
+    mod1 = F.normalize(mod1, dim=-1)
+    mod2 = F.normalize(mod2, dim=-1)
 
-    dissim_mod1 = (1 - sim_mod1) / 2
-    dissim_mod2 = (1 - sim_mod2) / 2
+    sim_mod1 = mod1 @ mod1.T
+    intra_mod1 = ((1 - sim_mod1) / 2).triu(diagonal=1).sum().item()
+    del sim_mod1
 
-    intra_mod1 = dissim_mod1.triu(diagonal=1).sum().item()
-    intra_mod2 = dissim_mod2.triu(diagonal=1).sum().item()
+    sim_mod2 = mod2 @ mod2.T
+    intra_mod2 = ((1 - sim_mod2) / 2).triu(diagonal=1).sum().item()
+    del sim_mod2
 
     return (factor_multiplier * (intra_mod1 + intra_mod2)) + numerator
 
