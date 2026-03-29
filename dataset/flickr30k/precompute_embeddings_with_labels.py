@@ -13,9 +13,12 @@ from tqdm import tqdm
 import open_clip
 from transformers import ConvNextImageProcessor, ConvNextForImageClassification
 
-# Keep behavior consistent with your existing script
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.abspath(".."))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
+
+os.chdir(SCRIPT_DIR)
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
 
 from dataloader import load_flickr30k_captions
 from config_loader import load_configs_from_dir
@@ -27,6 +30,21 @@ from config_loader import load_configs_from_dir
 
 def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
+
+
+def _resolve_path(path: str) -> str:
+    if os.path.isabs(path):
+        return path
+
+    candidates = [
+        os.path.abspath(os.path.join(PROJECT_ROOT, path)),
+        os.path.abspath(os.path.join(SCRIPT_DIR, path)),
+        os.path.abspath(path),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return candidates[0]
 
 
 def _to_numpy(x: torch.Tensor) -> np.ndarray:
@@ -60,15 +78,20 @@ def _save_npz(
 # -------- MODEL BUILDERS -----------
 # -----------------------------------
 
-def build_clip(cf, device: torch.device):
+def build_clip(device: torch.device, model_name: str, pretrained: str):
     clip_model, _, preprocess = open_clip.create_model_and_transforms(
-        "ViT-B-32", pretrained="laion2b_s34b_b79k"
+        model_name,
+        pretrained=pretrained,
     )
     clip_model = clip_model.to(device)
     clip_model.eval()
     for p in clip_model.parameters():
         p.requires_grad = False
     return clip_model, preprocess
+
+
+def build_model_output_name(model_name: str, pretrained: str) -> str:
+    return f"{model_name}___{pretrained}".replace("/", "_")
 
 
 def build_convnext(
@@ -161,6 +184,8 @@ def precompute_split(
             "split": split_name,
             "num_items": int(vis_np.shape[0]),
             "text_per_image": 5,
+            "clip_model": getattr(cf, "clip_model_name", None),
+            "clip_pretrained": getattr(cf, "clip_pretrained_name", None),
             "label_model": getattr(cf, "label_model_name", None),
             "label_space": "ImageNet-1k",
             "stores_label_logits": bool(store_logits),
@@ -287,14 +312,14 @@ def main():
     parser.add_argument(
         "--config_dir",
         type=str,
-        default="../config_dir/precompute_embedding_with_labels",
+        default="config_dir/precompute_embedding_with_labels",
         help="Directory containing config files (same as main.py)."
     )
     parser.add_argument(
         "--out_dir",
         type=str,
         default="./precomputed_embeddings_with_labels",
-        help="Output directory."
+        help="Output root directory. Default layout: <out_dir>/<model_name>/"
     )
     parser.add_argument(
         "--shard_size",
@@ -320,6 +345,24 @@ def main():
         help="HuggingFace ConvNeXt checkpoint for ImageNet-1k classification."
     )
     parser.add_argument(
+        "--device",
+        type=str,
+        default=None,
+        help="Device for CLIP (e.g. 'cuda:0' or 'cpu'). Default: cf.device.",
+    )
+    parser.add_argument(
+        "--clip_model",
+        type=str,
+        default="ViT-B-32",
+        help="OpenCLIP model name.",
+    )
+    parser.add_argument(
+        "--clip_pretrained",
+        type=str,
+        default="laion2b_s34b_b79k",
+        help="OpenCLIP pretrained tag.",
+    )
+    parser.add_argument(
         "--label_device",
         type=str,
         default=None,
@@ -335,9 +378,10 @@ def main():
 
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    configs = load_configs_from_dir(args.config_dir)
+    config_dir = _resolve_path(args.config_dir)
+    configs = load_configs_from_dir(config_dir)
     if len(configs) == 0:
-        raise RuntimeError(f"No configs found in {args.config_dir}")
+        raise RuntimeError(f"No configs found in {config_dir}")
 
     cfg_path, cf = configs[0]
     print(f"[CONFIG] Using: {cfg_path}")
@@ -348,19 +392,25 @@ def main():
     captions_by_file = load_flickr30k_captions(captions_txt)
 
     # devices
-    device = torch.device(cf.device)
+    device = torch.device(args.device) if args.device is not None else torch.device(cf.device)
     label_device = torch.device(args.label_device) if args.label_device is not None else device
 
     _ensure_dir(args.out_dir)
 
     # CLIP
-    clip_model, preprocess = build_clip(cf, device=device)
-    tokenizer = open_clip.get_tokenizer("ViT-B-32")
+    clip_model, preprocess = build_clip(
+        device=device,
+        model_name=args.clip_model,
+        pretrained=args.clip_pretrained,
+    )
+    tokenizer = open_clip.get_tokenizer(args.clip_model)
 
     # ConvNeXt
     convnext_processor, convnext_model = build_convnext(args.convnext_name, device=label_device)
 
     # Save the label model name in meta
+    setattr(cf, "clip_model_name", args.clip_model)
+    setattr(cf, "clip_pretrained_name", args.clip_pretrained)
     setattr(cf, "label_model_name", args.convnext_name)
 
     # normalization
@@ -368,10 +418,15 @@ def main():
     # If you want to preserve old behavior (always normalize), force:
     # normalize = True
 
-    # output dir per run/config
-    run_name = getattr(cf, "run", None) or os.path.splitext(os.path.basename(cfg_path))[0]
-    out_dir = os.path.join(args.out_dir, run_name)
+    model_output_name = build_model_output_name(args.clip_model, args.clip_pretrained)
+    out_dir = os.path.join(args.out_dir, model_output_name)
     _ensure_dir(out_dir)
+
+    print(f"[CLIP] model={args.clip_model}")
+    print(f"[CLIP] pretrained={args.clip_pretrained}")
+    print(f"[CLIP] device={device}")
+    print(f"[LABEL] device={label_device}")
+    print(f"[OUT] model_output_name={model_output_name}")
 
     precompute_split(
         cf=cf,

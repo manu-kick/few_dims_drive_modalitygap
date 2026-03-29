@@ -147,6 +147,10 @@ def build_clip(device: torch.device, model_name: str, pretrained: str):
     return model, preprocess, tokenizer
 
 
+def build_model_output_name(model_name: str, pretrained: str) -> str:
+    return f"{model_name}___{pretrained}".replace("/", "_")
+
+
 # =========================================================
 # Precompute
 # =========================================================
@@ -338,7 +342,7 @@ def main():
     # -------------------------
     # CONFIG
     # -------------------------
-    DATA_ROOT = "./data/mscoco"
+    DATA_ROOT = "/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco"
     SPLIT = "val"
     DEVICE = "cuda:2" if torch.cuda.is_available() else "cpu"
 
@@ -347,10 +351,16 @@ def main():
     TEXT_MODE = "first_caption"   # "first_caption" or "all_captions"
     SINGLE_OBJECT_ONLY = False
 
+    # [(ViT-B-32, laion2b_s34b_b79k), (ViT-B-16, laion2b_s34b_b88k), (RN50, laion2b_s34b_b82k)]
     CLIP_MODEL = "ViT-B-32"
     CLIP_PRETRAINED = "laion2b_s34b_b79k"
 
-    OUT_DIR = os.path.join(DATA_ROOT, f"precomputed_{SPLIT}2017_clip")
+    MODEL_OUTPUT_NAME = build_model_output_name(CLIP_MODEL, CLIP_PRETRAINED)
+    OUT_DIR = os.path.join(
+        DATA_ROOT,
+        MODEL_OUTPUT_NAME,
+        f"precomputed_{SPLIT}2017_clip",
+    )
 
     # -------------------------
     # Ensure dataset exists
@@ -366,6 +376,7 @@ def main():
     print(f"IMAGE_DIR       : {IMAGE_DIR}")
     print(f"INSTANCES_JSON  : {INSTANCES_JSON}")
     print(f"CAPTIONS_JSON   : {CAPTIONS_JSON}")
+    print(f"MODEL_OUTPUT    : {MODEL_OUTPUT_NAME}")
     print(f"OUT_DIR         : {OUT_DIR}")
     print(f"DEVICE          : {DEVICE}")
     print(f"TEXT_MODE       : {TEXT_MODE}")

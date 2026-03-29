@@ -7,7 +7,10 @@ import os
 import argparse
 import zipfile
 import urllib.request
+import sys
 from typing import Optional, Dict, Any, List
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.abspath(".."))
 
 import numpy as np
 import torch
@@ -155,6 +158,10 @@ def build_clip(device: torch.device, model_name: str, pretrained: str):
 		p.requires_grad = False
 	tokenizer = open_clip.get_tokenizer(model_name)
 	return model, preprocess, tokenizer
+
+
+def build_model_output_name(model_name: str, pretrained: str) -> str:
+	return f"{model_name}___{pretrained}".replace("/", "_")
 
 
 def build_convnext(
@@ -369,7 +376,7 @@ def main() -> None:
 		"--out_dir",
 		type=str,
 		default=None,
-		help="Output directory. Default: <data_root>/precomputed_<split>2017_clip_imagenet",
+		help="Output directory. Default: <data_root>/<model_name>/precomputed_<split>2017_clip_imagenet",
 	)
 	parser.add_argument(
 		"--device",
@@ -439,7 +446,14 @@ def main() -> None:
 
 	out_dir = args.out_dir
 	if out_dir is None:
-		out_dir = os.path.join(args.data_root, f"precomputed_{args.split}2017_clip_imagenet")
+		model_output_name = build_model_output_name(args.clip_model, args.clip_pretrained)
+		out_dir = os.path.join(
+			args.data_root,
+			model_output_name,
+			f"precomputed_{args.split}2017_clip_imagenet",
+		)
+	else:
+		model_output_name = build_model_output_name(args.clip_model, args.clip_pretrained)
 
 	print("\n[CONFIG]")
 	print(f"DATA_ROOT       : {args.data_root}")
@@ -447,6 +461,7 @@ def main() -> None:
 	print(f"IMAGE_DIR       : {image_dir}")
 	print(f"INSTANCES_JSON  : {instances_json}")
 	print(f"CAPTIONS_JSON   : {captions_json}")
+	print(f"MODEL_OUTPUT    : {model_output_name}")
 	print(f"OUT_DIR         : {out_dir}")
 	print(f"DEVICE          : {device}")
 	print(f"LABEL_DEVICE    : {label_device}")

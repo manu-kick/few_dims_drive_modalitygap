@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import re
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -44,6 +45,19 @@ DEFAULT_PATHS = {
     "msrvtt_train": "/mnt/media/emanuele/few_dimensions/dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_v2/precomputed_train",
     "msrvtt_test": "/mnt/media/emanuele/few_dimensions/dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_v2/precomputed_test",
 }
+
+DEFAULT_MODEL_NAME = "ViT-B-32___laion2b_s34b_b79k"
+
+
+def build_embedding_paths(model_name=DEFAULT_MODEL_NAME):
+    normalized_model_name = resolve_embedding_model_name(model_name=model_name, path_hints=[])
+    return {
+        "flickr30k": f"/mnt/media/emanuele/few_dimensions/dataset/flickr30k/precomputed_embeddings_with_labels/{normalized_model_name.lower().replace('vit-b-32', 'clip_vit_b_32').replace('vit-b-16', 'clip_vit_b_16')}",
+        "mscoco_train": "/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/precomputed_train2017_clip_imagenet",
+        "mscoco_val": "/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/precomputed_val2017_clip_imagenet",
+        "msrvtt_train": f"/mnt/media/emanuele/few_dimensions/dataset/msrvtt/{normalized_model_name}_v2/precomputed_train",
+        "msrvtt_test": f"/mnt/media/emanuele/few_dimensions/dataset/msrvtt/{normalized_model_name}_v2/precomputed_test",
+    }
 
 
 DEFAULT_CONFIGS = {
@@ -628,7 +642,7 @@ def evaluate_i0t_mscoco_imagenet(
 
     return {
         "method": "I0T",
-        "dataset": "mscoco_imagenet_labels",
+        "dataset": "mscoco_imagenet",
         "retrieval_orig": retrieval_orig,
         "retrieval_i0t": retrieval_i0t,
         "gaps_orig": gaps_orig,
@@ -779,16 +793,72 @@ def summarize_i0t_result(result):
     return summary
 
 
-def export_i0t_results(results_by_dataset, export_path):
+def _normalize_model_name(value):
+    if value is None:
+        return None
+
+    value = str(value).strip().rstrip("/")
+    if not value:
+        return None
+
+    base = os.path.basename(value)
+    if base.startswith("precomputed_") or base in {"precomputed_train", "precomputed_test"}:
+        parent = os.path.basename(os.path.dirname(value))
+        if parent:
+            base = parent
+
+    base = re.sub(r"^cifar10_(?:train|test)_", "", base)
+    base = base.replace("clip_vit_b_32", "ViT-B-32")
+    base = base.replace("clip_vit_b_16", "ViT-B-16")
+    base = re.sub(r"_v2$", "", base)
+    base = re.sub(r"_{3,}", "__", base)
+    base = re.sub(r"^(ViT-[A-Za-z0-9-]+)_(.+)$", r"\1__\2", base)
+    return base if "ViT-" in base else None
+
+
+def resolve_embedding_model_name(model_name=None, path_hints=None):
+    candidates = []
+    if model_name is not None:
+        candidates.append(model_name)
+    if path_hints is not None:
+        candidates.extend(path_hints)
+    candidates.extend(DEFAULT_PATHS.values())
+
+    for candidate in candidates:
+        normalized = _normalize_model_name(candidate)
+        if normalized is not None:
+            return normalized
+
+    raise ValueError(
+        "Could not resolve model name for export. Pass model_name explicitly or provide path hints."
+    )
+
+
+def export_i0t_results(results_by_dataset, export_path, model_name=None, path_hints=None):
     export_path = Path(export_path)
     export_path.parent.mkdir(parents=True, exist_ok=True)
 
-    compact = {
-        dataset_name: summarize_i0t_result(result)
-        for dataset_name, result in results_by_dataset.items()
-    }
+    compact = {}
+    for dataset_name, result in results_by_dataset.items():
+        if result is None:
+            continue
+        summary = summarize_i0t_result(result)
+        summary["dataset"] = dataset_name
+        compact[dataset_name] = summary
+
+    resolved_model_name = resolve_embedding_model_name(model_name=model_name, path_hints=path_hints)
+
+    if export_path.exists():
+        with export_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    else:
+        payload = {}
+
+    model_payload = payload.get(resolved_model_name, {})
+    model_payload.update(compact)
+    payload[resolved_model_name] = model_payload
 
     with export_path.open("w", encoding="utf-8") as handle:
-        json.dump(compact, handle, indent=2)
+        json.dump(payload, handle, indent=2)
 
     return export_path

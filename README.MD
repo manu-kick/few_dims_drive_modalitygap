@@ -9,3 +9,9 @@ We want a method that we can apply to the pretrained encoder that allows us to g
 TODO:
 - check that the cosine dissimilarity d in the RMG computation is actually scaled in 0,1 like the two effects one trigger
 - 
+
+HOW TO START:
+1) Precompute MSCOCO embeddings using the model you wish. Move in the correct dataset directory and run the following command for each split (train, val):
+python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16___laion2b_s34b_b88k --clip_model=ViT-B-16 --clip_pretrained=laion2b_s34b_b88k --split=val 
+2) Precompute FLICKR30K embeddings using the model you wish. Move in the correct dataset directory and run the following command:
+python precompute_flickr_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/

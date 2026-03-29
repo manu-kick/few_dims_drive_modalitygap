@@ -1,152 +1,154 @@
 {
-  "flickr30k": {
-    "method": "GR-CLIP",
-    "dataset": "flickr30k",
-    "direction": "text_to_vision",
-    "grclip_stats": {
-      "n_fit": 10000,
-      "embedding_dim": 512,
-      "query_text_mean_norm": 0.5413786768913269,
-      "document_text_mean_norm": 0.5413786768913269,
-      "document_image_mean_norm": 0.5756060481071472
+  "ViT-B-32___laion2b_s34b_b79k": {
+    "flickr30k": {
+      "method": "GR-CLIP",
+      "dataset": "flickr30k",
+      "direction": "text_to_vision",
+      "grclip_stats": {
+        "n_fit": 10000,
+        "embedding_dim": 512,
+        "query_text_mean_norm": 0.5413786768913269,
+        "document_text_mean_norm": 0.5413786768913269,
+        "document_image_mean_norm": 0.5756060481071472
+      },
+      "retrieval_orig": {
+        "1": 0.5694831609725952,
+        "5": 0.8008203506469727,
+        "10": 0.8656275868415833
+      },
+      "retrieval_aligned": {
+        "1": 0.5338802337646484,
+        "5": 0.764561116695404,
+        "10": 0.8400328159332275
+      },
+      "gaps_orig": {
+        "L2M": 0.6853559613227844,
+        "L2I": 1.1632107496261597,
+        "cosineTP": 0.32275527715682983,
+        "RMG": 0.7977277144749543
+      },
+      "gaps_aligned": {
+        "L2M": 0.019340697675943375,
+        "L2I": 1.1323096752166748,
+        "cosineTP": 0.3559030294418335,
+        "RMG": 0.7203946802075843
+      },
+      "mean_rmg_over_batches": {
+        "orig": 0.7977277144749543,
+        "aligned": 0.7203946802075843
+      },
+      "clustering_orig": {
+        "ARI": 0.05909677586457568,
+        "NMI": 0.5437534413578959,
+        "Homogeneity": 0.5646756239089785,
+        "V-measure": 0.5437534413578959
+      },
+      "clustering_aligned": {
+        "ARI": 0.06199536468865265,
+        "NMI": 0.5504631687304211,
+        "Homogeneity": 0.5725763965206722,
+        "V-measure": 0.5504631687304211
+      }
     },
-    "retrieval_orig": {
-      "1": 0.5694831609725952,
-      "5": 0.8008203506469727,
-      "10": 0.8656275868415833
+    "mscoco_imagenet": {
+      "method": "GR-CLIP",
+      "dataset": "mscoco_imagenet",
+      "direction": "text_to_vision",
+      "grclip_stats": {
+        "n_fit": 10000,
+        "embedding_dim": 512,
+        "query_text_mean_norm": 0.5748849511146545,
+        "document_text_mean_norm": 0.5748849511146545,
+        "document_image_mean_norm": 0.5603824853897095
+      },
+      "retrieval_orig": {
+        "1": 0.36449727416038513,
+        "5": 0.6296594738960266,
+        "10": 0.7332258820533752
+      },
+      "retrieval_aligned": {
+        "1": 0.3459601104259491,
+        "5": 0.5877493619918823,
+        "10": 0.7003828287124634
+      },
+      "gaps_orig": {
+        "L2M": 0.7363729476928711,
+        "L2I": 1.178350806236267,
+        "cosineTP": 0.3050069510936737,
+        "RMG": 0.80432542692993
+      },
+      "gaps_aligned": {
+        "L2M": 0.026514483615756035,
+        "L2I": 1.1153106689453125,
+        "cosineTP": 0.3752892017364502,
+        "RMG": 0.714288914038735
+      },
+      "mean_rmg_over_batches": {
+        "orig": 0.80432542692993,
+        "aligned": 0.714288914038735
+      },
+      "clustering_orig": {
+        "ARI": 0.14013953924261072,
+        "NMI": 0.6741491437501304,
+        "Homogeneity": 0.7290975144288381,
+        "V-measure": 0.6741491437501304
+      },
+      "clustering_aligned": {
+        "ARI": 0.13131190799974285,
+        "NMI": 0.6792434552390452,
+        "Homogeneity": 0.737673917031683,
+        "V-measure": 0.6792434552390452
+      }
     },
-    "retrieval_aligned": {
-      "1": 0.5338802337646484,
-      "5": 0.764561116695404,
-      "10": 0.8400328159332275
-    },
-    "gaps_orig": {
-      "L2M": 0.6853559613227844,
-      "L2I": 1.1632107496261597,
-      "cosineTP": 0.32275527715682983,
-      "RMG": 0.7977277144749543
-    },
-    "gaps_aligned": {
-      "L2M": 0.019340697675943375,
-      "L2I": 1.1323096752166748,
-      "cosineTP": 0.3559030294418335,
-      "RMG": 0.7203946802075843
-    },
-    "mean_rmg_over_batches": {
-      "orig": 0.7977277144749543,
-      "aligned": 0.7203946802075843
-    },
-    "clustering_orig": {
-      "ARI": 0.05909677586457568,
-      "NMI": 0.5437534413578959,
-      "Homogeneity": 0.5646756239089785,
-      "V-measure": 0.5437534413578959
-    },
-    "clustering_aligned": {
-      "ARI": 0.06199536468865265,
-      "NMI": 0.5504631687304211,
-      "Homogeneity": 0.5725763965206722,
-      "V-measure": 0.5504631687304211
-    }
-  },
-  "mscoco_imagenet": {
-    "method": "GR-CLIP",
-    "dataset": "mscoco_imagenet",
-    "direction": "text_to_vision",
-    "grclip_stats": {
-      "n_fit": 10000,
-      "embedding_dim": 512,
-      "query_text_mean_norm": 0.5748849511146545,
-      "document_text_mean_norm": 0.5748849511146545,
-      "document_image_mean_norm": 0.5603824853897095
-    },
-    "retrieval_orig": {
-      "1": 0.36449727416038513,
-      "5": 0.6296594738960266,
-      "10": 0.7332258820533752
-    },
-    "retrieval_aligned": {
-      "1": 0.3459601104259491,
-      "5": 0.5877493619918823,
-      "10": 0.7003828287124634
-    },
-    "gaps_orig": {
-      "L2M": 0.7363729476928711,
-      "L2I": 1.178350806236267,
-      "cosineTP": 0.3050069510936737,
-      "RMG": 0.80432542692993
-    },
-    "gaps_aligned": {
-      "L2M": 0.026514483615756035,
-      "L2I": 1.1153106689453125,
-      "cosineTP": 0.3752892017364502,
-      "RMG": 0.714288914038735
-    },
-    "mean_rmg_over_batches": {
-      "orig": 0.80432542692993,
-      "aligned": 0.714288914038735
-    },
-    "clustering_orig": {
-      "ARI": 0.14013953924261072,
-      "NMI": 0.6741491437501304,
-      "Homogeneity": 0.7290975144288381,
-      "V-measure": 0.6741491437501304
-    },
-    "clustering_aligned": {
-      "ARI": 0.13131190799974285,
-      "NMI": 0.6792434552390452,
-      "Homogeneity": 0.737673917031683,
-      "V-measure": 0.6792434552390452
-    }
-  },
-  "msrvtt_v2": {
-    "method": "GR-CLIP",
-    "dataset": "msrvtt_v2",
-    "direction": "text_to_vision",
-    "grclip_stats": {
-      "n_fit": 7010,
-      "embedding_dim": 512,
-      "query_text_mean_norm": 0.6659067869186401,
-      "document_text_mean_norm": 0.6659067869186401,
-      "document_image_mean_norm": 0.655765950679779
-    },
-    "retrieval_orig": {
-      "1": 0.32600000500679016,
-      "5": 0.5789999961853027,
-      "10": 0.6859999895095825
-    },
-    "retrieval_aligned": {
-      "1": 0.34599998593330383,
-      "5": 0.5759999752044678,
-      "10": 0.7009999752044678
-    },
-    "gaps_orig": {
-      "L2M": 0.7806441187858582,
-      "L2I": 1.1991441249847412,
-      "cosineTP": 0.2800264060497284,
-      "RMG": 0.8380064872521648
-    },
-    "gaps_aligned": {
-      "L2M": 0.07942454516887665,
-      "L2I": 1.2191202640533447,
-      "cosineTP": 0.25315117835998535,
-      "RMG": 0.7497735126952625
-    },
-    "mean_rmg_over_batches": {
-      "orig": 0.8380064872521648,
-      "aligned": 0.7497735126952625
-    },
-    "clustering_orig": {
-      "ARI": 0.11275031736661961,
-      "NMI": 0.24479879838727361,
-      "Homogeneity": 0.2474051032634846,
-      "V-measure": 0.24479879838727361
-    },
-    "clustering_aligned": {
-      "ARI": 0.16318435176916254,
-      "NMI": 0.3103431592882044,
-      "Homogeneity": 0.31431849831030745,
-      "V-measure": 0.3103431592882044
+    "msrvtt_v2": {
+      "method": "GR-CLIP",
+      "dataset": "msrvtt_v2",
+      "direction": "text_to_vision",
+      "grclip_stats": {
+        "n_fit": 7010,
+        "embedding_dim": 512,
+        "query_text_mean_norm": 0.6659067869186401,
+        "document_text_mean_norm": 0.6659067869186401,
+        "document_image_mean_norm": 0.655765950679779
+      },
+      "retrieval_orig": {
+        "1": 0.32600000500679016,
+        "5": 0.5789999961853027,
+        "10": 0.6859999895095825
+      },
+      "retrieval_aligned": {
+        "1": 0.34599998593330383,
+        "5": 0.5759999752044678,
+        "10": 0.7009999752044678
+      },
+      "gaps_orig": {
+        "L2M": 0.7806441187858582,
+        "L2I": 1.1991441249847412,
+        "cosineTP": 0.2800264060497284,
+        "RMG": 0.8380064872521648
+      },
+      "gaps_aligned": {
+        "L2M": 0.07942454516887665,
+        "L2I": 1.2191202640533447,
+        "cosineTP": 0.25315117835998535,
+        "RMG": 0.7497735126952625
+      },
+      "mean_rmg_over_batches": {
+        "orig": 0.8380064872521648,
+        "aligned": 0.7497735126952625
+      },
+      "clustering_orig": {
+        "ARI": 0.11275031736661961,
+        "NMI": 0.24479879838727361,
+        "Homogeneity": 0.2474051032634846,
+        "V-measure": 0.24479879838727361
+      },
+      "clustering_aligned": {
+        "ARI": 0.16318435176916254,
+        "NMI": 0.3103431592882044,
+        "Homogeneity": 0.31431849831030745,
+        "V-measure": 0.3103431592882044
+      }
     }
   }
 }
