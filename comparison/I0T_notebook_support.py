@@ -52,9 +52,9 @@ DEFAULT_MODEL_NAME = "ViT-B-32___laion2b_s34b_b79k"
 def build_embedding_paths(model_name=DEFAULT_MODEL_NAME):
     normalized_model_name = resolve_embedding_model_name(model_name=model_name, path_hints=[])
     return {
-        "flickr30k": f"/mnt/media/emanuele/few_dimensions/dataset/flickr30k/precomputed_embeddings_with_labels/{normalized_model_name.lower().replace('vit-b-32', 'clip_vit_b_32').replace('vit-b-16', 'clip_vit_b_16')}",
-        "mscoco_train": "/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/precomputed_train2017_clip_imagenet",
-        "mscoco_val": "/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/precomputed_val2017_clip_imagenet",
+        "flickr30k": f"/mnt/media/emanuele/few_dimensions/dataset/flickr30k/precomputed_embeddings_with_labels/{model_name}",
+        "mscoco_train": f"/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/{model_name}/precomputed_train2017_clip_imagenet",
+        "mscoco_val": f"/mnt/media/emanuele/few_dimensions/dataset/mscoco/data/mscoco/{model_name}/precomputed_val2017_clip_imagenet",
         "msrvtt_train": f"/mnt/media/emanuele/few_dimensions/dataset/msrvtt/{normalized_model_name}_v2/precomputed_train",
         "msrvtt_test": f"/mnt/media/emanuele/few_dimensions/dataset/msrvtt/{normalized_model_name}_v2/precomputed_test",
     }
