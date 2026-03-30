@@ -15,6 +15,7 @@ scenario_2
 dataset/cifar10/data/
 dataset/cifar10/precomputed_cifar10_text_vision_labels/
 dataset/mscoco/data
+dataset/mscoco/ViT-B-16-SigLIP2-256
 dataset/msrvtt/MSRVTT
 dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_multiple_videos
 dataset/msrvtt/ViT-B-32___laion2b_s34b_b79k_v2

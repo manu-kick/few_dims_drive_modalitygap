@@ -17,3 +17,10 @@ HOW TO START:
 python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16___laion2b_s34b_b88k --clip_model=ViT-B-16 --clip_pretrained=laion2b_s34b_b88k --split=val 
 2) Precompute FLICKR30K embeddings using the model you wish. Move in the correct dataset directory and run the following command:
 python precompute_flickr_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/
+python precompute_flickr_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/flickr30k/precomputed_embeddings_with_labels/ViT-B-16-SigLIP2-256 --clip_model=ViT-B-16-SigLIP2-256 --clip_pretrained=webli --device=cuda:1
+
+
+
+python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16-SigLIP2-256/test --clip_model=ViT-B-16-SigLIP2-256 --clip_pretrained=webli --split=val --device=cuda:0 
+
+python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16-SigLIP2-256 --clip_model=ViT-B-16-SigLIP2-256 --clip_pretrained=webli --split=train --device=cuda:2 
