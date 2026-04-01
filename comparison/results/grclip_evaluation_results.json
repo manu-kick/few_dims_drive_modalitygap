@@ -456,5 +456,107 @@
         "V-measure": 0.6722865658491792
       }
     }
+  },
+  "ViT-L-16-SigLIP2-256___webli": {
+    "flickr30k": {
+      "method": "GR-CLIP",
+      "dataset": "flickr30k",
+      "direction": "text_to_vision",
+      "grclip_stats": {
+        "n_fit": 10000,
+        "embedding_dim": 1024,
+        "query_text_mean_norm": 0.5406177043914795,
+        "document_text_mean_norm": 0.5406177043914795,
+        "document_image_mean_norm": 0.75042724609375
+      },
+      "retrieval_orig": {
+        "1": 0.7744052410125732,
+        "5": 0.9219031929969788,
+        "10": 0.9543888568878174
+      },
+      "retrieval_aligned": {
+        "1": 0.7330598831176758,
+        "5": 0.9038556218147278,
+        "10": 0.9443806409835815
+      },
+      "gaps_orig": {
+        "L2M": 0.9679737091064453,
+        "L2I": 1.2810100317001343,
+        "cosineTP": 0.1791151612997055,
+        "RMG": 0.851732267775231
+      },
+      "gaps_aligned": {
+        "L2M": 0.01853019744157791,
+        "L2I": 1.0962858200073242,
+        "cosineTP": 0.3959595263004303,
+        "RMG": 0.7072859506684607
+      },
+      "mean_rmg_over_batches": {
+        "orig": 0.851732267775231,
+        "aligned": 0.7072859506684607
+      },
+      "clustering_orig": {
+        "ARI": 0.06004182170373789,
+        "NMI": 0.537315311715357,
+        "Homogeneity": 0.5554261219273009,
+        "V-measure": 0.537315311715357
+      },
+      "clustering_aligned": {
+        "ARI": 0.06531737055004311,
+        "NMI": 0.5512217412644982,
+        "Homogeneity": 0.573068501369134,
+        "V-measure": 0.5512217412644982
+      }
+    },
+    "mscoco_imagenet": {
+      "method": "GR-CLIP",
+      "dataset": "mscoco_imagenet",
+      "direction": "text_to_vision",
+      "grclip_stats": {
+        "n_fit": 10000,
+        "embedding_dim": 1024,
+        "query_text_mean_norm": 0.5990010499954224,
+        "document_text_mean_norm": 0.5990010499954224,
+        "document_image_mean_norm": 0.7274603843688965
+      },
+      "retrieval_orig": {
+        "1": 0.5101752877235413,
+        "5": 0.7420914769172668,
+        "10": 0.8212774395942688
+      },
+      "retrieval_aligned": {
+        "1": 0.48095908761024475,
+        "5": 0.718517005443573,
+        "10": 0.8023372888565063
+      },
+      "gaps_orig": {
+        "L2M": 0.9947764873504639,
+        "L2I": 1.3029747009277344,
+        "cosineTP": 0.15067575871944427,
+        "RMG": 0.859423359334855
+      },
+      "gaps_aligned": {
+        "L2M": 0.03140007331967354,
+        "L2I": 1.1210994720458984,
+        "cosineTP": 0.3682991564273834,
+        "RMG": 0.7165771766842147
+      },
+      "mean_rmg_over_batches": {
+        "orig": 0.859423359334855,
+        "aligned": 0.7165771766842147
+      },
+      "clustering_orig": {
+        "ARI": 0.1352406759057148,
+        "NMI": 0.6580386107490573,
+        "Homogeneity": 0.7070370677119269,
+        "V-measure": 0.6580386107490575
+      },
+      "clustering_aligned": {
+        "ARI": 0.11669444953619021,
+        "NMI": 0.6668045910043298,
+        "Homogeneity": 0.7251129361328091,
+        "V-measure": 0.6668045910043298
+      }
+    }
   }
 }

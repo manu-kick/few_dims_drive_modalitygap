@@ -21,6 +21,3 @@ python precompute_flickr_embeddings_with_imagenet_labels.py --out_dir=/mnt/media
 
 
 
-python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16-SigLIP2-256/test --clip_model=ViT-B-16-SigLIP2-256 --clip_pretrained=webli --split=val --device=cuda:0 
-
-python precompute_mscoco_embeddings_with_imagenet_labels.py --out_dir=/mnt/media/emanuele/few_dimensions/dataset/mscoco/ViT-B-16-SigLIP2-256 --clip_model=ViT-B-16-SigLIP2-256 --clip_pretrained=webli --split=train --device=cuda:2 
